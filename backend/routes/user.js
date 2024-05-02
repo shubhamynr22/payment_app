@@ -3,21 +3,27 @@ const zod = require('zod');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const User = require('../database/userSchema');
-
+const { authMiddleware } = require('../middleware');
 const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const signupBody = zod.object({
   username: zod.string().email(),
+  password: zod.string(),
   firstName: zod.string(),
-  lastName: zod.string(),
-  password: zod.string()
+  lastName: zod.string()
 });
 
 const signinBody = zod.object({
   username: zod.string().email(),
   password: zod.string()
+});
+
+const updateBody = zod.object({
+  password: zod.string().optional(),
+  firstName: zod.string().optional(),
+  lastName: zod.string().optional()
 });
 
 router.post('/signup', async (req, res) => {
@@ -88,6 +94,46 @@ router.post('/signin', async (req, res) => {
 
   res.status(411).json({
     message: 'Error while logging in'
+  });
+});
+
+router.put('/', authMiddleware, async (req, res) => {
+  const { success } = updateBody.safeParse(req.body);
+  if (!success) {
+    return res.status(411).json({ message: 'Invalid input' });
+  }
+  await User.updateOne(
+    {
+      _id: req.userId
+    },
+    req.body
+  );
+  res.status(200).json({ message: 'Updated successfully' });
+});
+
+router.get('/bulk', authMiddleware, async (req, res) => {
+  const filter = req.query.filter || '';
+  const users = await User.find({
+    $or: [
+      {
+        firstName: {
+          $regex: filter
+        }
+      },
+      {
+        lastName: {
+          $regex: filter
+        }
+      }
+    ]
+  });
+  res.status(200).json({
+    user: users.map((user) => ({
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      _id: user._id
+    }))
   });
 });
 module.exports = router;

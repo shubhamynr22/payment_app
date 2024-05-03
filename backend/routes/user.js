@@ -2,7 +2,7 @@ const { Router } = require('express');
 const zod = require('zod');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const User = require('../database/userSchema');
+const { User, Account } = require('../database/userSchema');
 const { authMiddleware } = require('../middleware');
 const router = Router();
 
@@ -52,12 +52,12 @@ router.post('/signup', async (req, res) => {
   });
   const userId = user._id;
 
-  const token = jwt.sign(
-    {
-      userId
-    },
-    JWT_SECRET
-  );
+  await Account.create({
+    userId: userId,
+    balance: parseInt(Math.random() * 10000)
+  });
+
+  const token = jwt.sign({ userId }, JWT_SECRET);
 
   res.json({
     message: 'User created successfully',
@@ -78,22 +78,20 @@ router.post('/signin', async (req, res) => {
     password: req.body.password
   });
 
-  if (user) {
-    const token = jwt.sign(
-      {
-        userId: user._id
-      },
-      JWT_SECRET
-    );
-
-    res.json({
-      token: token
+  if (!user) {
+    res.status(411).json({
+      message: 'Error while logging in'
     });
-    return;
   }
+  const token = jwt.sign(
+    {
+      userId: user._id
+    },
+    JWT_SECRET
+  );
 
-  res.status(411).json({
-    message: 'Error while logging in'
+  return res.json({
+    token: token
   });
 });
 
